@@ -1,0 +1,9 @@
+services:
+  lgtm:
+    # Grafana + OTel Collector + Tempo (traces) + Loki (logs) + Prometheus (metrics) in one container.
+    image: grafana/otel-lgtm:0.38.1
+    ports:
+      # Bind to localhost only: anonymous admin Grafana and unauthenticated OTLP receivers.
+      - "127.0.0.1:3000:3000" # Grafana
+      - "127.0.0.1:4317:4317" # OTLP gRPC
+      - "127.0.0.1:4318:4318" # OTLP HTTP
