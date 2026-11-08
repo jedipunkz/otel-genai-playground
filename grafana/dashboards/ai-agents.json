@@ -1,0 +1,147 @@
+{
+  "uid": "ai-agents",
+  "title": "AI Agents (OTel GenAI)",
+  "tags": ["genai", "otel"],
+  "timezone": "browser",
+  "schemaVersion": 41,
+  "time": { "from": "now-3h", "to": "now" },
+  "refresh": "30s",
+  "panels": [
+    {
+      "type": "row", "title": "Claude Code metrics (Prometheus)", "collapsed": false,
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 }
+    },
+    {
+      "type": "stat", "title": "Cost (USD)",
+      "description": "Counters are per session (session.id label), so max per series then sum.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 0, "y": 1, "w": 6, "h": 6 },
+      "fieldConfig": { "defaults": { "unit": "currencyUSD", "decimals": 4 } },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        { "refId": "A", "expr": "sum(max_over_time(claude_code_cost_usage_USD_total[$__range]))", "instant": true }
+      ]
+    },
+    {
+      "type": "stat", "title": "Cache read ratio",
+      "description": "cacheRead / (input + cacheRead + cacheCreation)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 6, "y": 1, "w": 6, "h": 6 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 1 } },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        {
+          "refId": "A", "instant": true,
+          "expr": "sum(max_over_time(claude_code_token_usage_tokens_total{type=\"cacheRead\"}[$__range])) / sum(max_over_time(claude_code_token_usage_tokens_total{type=~\"input|cacheRead|cacheCreation\"}[$__range]))"
+        }
+      ]
+    },
+    {
+      "type": "bargauge", "title": "Tokens by type and model",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 12, "y": 1, "w": 12, "h": 6 },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "options": { "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        {
+          "refId": "A", "instant": true, "legendFormat": "{{model}} {{type}}",
+          "expr": "sum by (model, type) (max_over_time(claude_code_token_usage_tokens_total[$__range]))"
+        }
+      ]
+    },
+    {
+      "type": "row", "title": "All agents (Tempo TraceQL metrics on gen_ai.* span attributes)", "collapsed": false,
+      "gridPos": { "x": 0, "y": 7, "w": 24, "h": 1 }
+    },
+    {
+      "type": "timeseries", "title": "LLM call latency p95",
+      "description": "Spans with gen_ai.request.model: ADK generate_content, OpenCode SessionStep.attempt, Claude Code claude_code.llm_request.",
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "points", "pointSize": 8 } } },
+      "targets": [
+        {
+          "refId": "A", "queryType": "traceql", "metricsQueryType": "range",
+          "query": "{ span.gen_ai.request.model != nil } | quantile_over_time(duration, .95) by (resource.service.name)"
+        }
+      ]
+    },
+    {
+      "type": "timeseries", "title": "Tool call latency p95",
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "points", "pointSize": 8 } } },
+      "targets": [
+        {
+          "refId": "A", "queryType": "traceql", "metricsQueryType": "range",
+          "query": "{ span.gen_ai.tool.name != nil } | quantile_over_time(duration, .95) by (resource.service.name, span.gen_ai.tool.name)"
+        }
+      ]
+    },
+    {
+      "type": "timeseries", "title": "Tool calls",
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "gridPos": { "x": 0, "y": 16, "w": 8, "h": 8 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "bars", "fillOpacity": 80, "stacking": { "mode": "normal" } } } },
+      "targets": [
+        {
+          "refId": "A", "queryType": "traceql", "metricsQueryType": "range",
+          "query": "{ span.gen_ai.tool.name != nil } | count_over_time() by (resource.service.name, span.gen_ai.tool.name)"
+        }
+      ]
+    },
+    {
+      "type": "timeseries", "title": "Input tokens (gen_ai.usage.input_tokens)",
+      "description": "Claude Code is missing here: its spans use input_tokens, not gen_ai.usage.input_tokens.",
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "gridPos": { "x": 8, "y": 16, "w": 8, "h": 8 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "bars", "fillOpacity": 80, "stacking": { "mode": "normal" } } } },
+      "targets": [
+        {
+          "refId": "A", "queryType": "traceql", "metricsQueryType": "range",
+          "query": "{ span.gen_ai.usage.input_tokens != nil } | sum_over_time(span.gen_ai.usage.input_tokens) by (resource.service.name)"
+        }
+      ]
+    },
+    {
+      "type": "timeseries", "title": "Errored LLM / tool spans",
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "gridPos": { "x": 16, "y": 16, "w": 8, "h": 8 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "bars", "fillOpacity": 80 } } },
+      "targets": [
+        {
+          "refId": "A", "queryType": "traceql", "metricsQueryType": "range",
+          "query": "{ (span.gen_ai.request.model != nil || span.gen_ai.tool.name != nil) && status = error } | count_over_time() by (resource.service.name)"
+        }
+      ]
+    },
+    {
+      "type": "table", "title": "Recent tool calls (click a trace ID to open it)",
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "gridPos": { "x": 0, "y": 24, "w": 24, "h": 8 },
+      "targets": [
+        {
+          "refId": "A", "queryType": "traceql", "tableType": "spans", "limit": 50, "spss": 10,
+          "query": "{ span.gen_ai.tool.name != nil } | select(span.gen_ai.tool.name, span.gen_ai.tool.call.id)"
+        }
+      ]
+    },
+    {
+      "type": "row", "title": "Claude Code events (Loki)", "collapsed": false,
+      "gridPos": { "x": 0, "y": 32, "w": 24, "h": 1 }
+    },
+    {
+      "type": "logs", "title": "Tool decisions and results",
+      "description": "Each event carries trace_id and span_id, so it links back to the claude_code.tool span.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "x": 0, "y": 33, "w": 24, "h": 8 },
+      "options": { "showTime": true, "enableLogDetails": true },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{service_name=\"claude-code\"} | event_name=~\"tool_decision|tool_result|api_request|api_error\""
+        }
+      ]
+    }
+  ]
+}

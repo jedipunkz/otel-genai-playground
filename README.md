@@ -33,6 +33,16 @@ Each script runs one prompt that makes the agent call one tool (read `workspace/
 `get_weather` function in ADK). Open Grafana > Explore > Tempo and search by `service.name`:
 `adk-go-fake-agent`, `opencode`, `claude-code`. Tempo search can lag ingestion by 10-30 seconds.
 
+A provisioned dashboard, **AI Agents (OTel GenAI)**, is at http://127.0.0.1:3000/d/ai-agents
+(`grafana/dashboards/ai-agents.json`):
+
+- Claude Code metrics: cost, cache read ratio, tokens by type and model (Prometheus).
+- All agents, from span attributes: LLM and tool call p95 latency, tool call count,
+  `gen_ai.usage.input_tokens`, errored spans (Tempo TraceQL metrics), and a table of recent tool calls.
+- Claude Code tool / API events (Loki). Each event carries `trace_id`, linking it to its span.
+
+Claude Code counters are per session (`session.id` label), so panels take `max_over_time` per series and sum.
+
 Useful TraceQL:
 
 ```

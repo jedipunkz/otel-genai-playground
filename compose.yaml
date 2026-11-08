@@ -7,3 +7,6 @@ services:
       - "127.0.0.1:3000:3000" # Grafana
       - "127.0.0.1:4317:4317" # OTLP gRPC
       - "127.0.0.1:4318:4318" # OTLP HTTP
+    volumes:
+      - ./grafana/dashboards:/otel-lgtm/grafana/conf/provisioning/dashboards/custom:ro
+      - ./grafana/dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/custom.yaml:ro
