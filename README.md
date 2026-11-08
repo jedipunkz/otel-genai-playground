@@ -44,7 +44,7 @@ Ports are bound to `127.0.0.1` only: Grafana runs with anonymous admin and the O
 
 ## What each agent emits
 
-Observed with adk-go v2.7.1, OpenCode v2.2.5 and Claude Code v2.1.314.
+Observed with adk-go v2.7.1, OpenCode v2.2.6 and Claude Code v2.1.314.
 
 ### ADK for Go
 
@@ -67,12 +67,23 @@ invoke_workflow weather_agent        gen_ai.operation.name, gen_ai.workflow.name
 ### OpenCode
 
 Exports when `OTEL_EXPORTER_OTLP_ENDPOINT` is set (V1's `experimental.openTelemetry` is ignored in V2).
-Span names are the internal Effect function names: `Session.prompt`, `SessionRunner.runStep`,
-`SessionStep.attempt`, `Tool.execute`, `ReadTool.read`, ...
+Span names are the internal Effect function names, and each session turn is its own trace
+(about 240 spans for this one-tool prompt). Every span in the turn carries `session.id`.
 
-- v2.2.5: session spans nest under one `ServerProcess.start` trace and carry no attributes.
-- v2.2.6+: each session turn is its own trace; model and tool spans carry `gen_ai.provider.name`,
-  `gen_ai.request.model`, token usage, `gen_ai.tool.name`, `gen_ai.tool.call.id` and `session.id`
+```
+SessionRunner.drain
+└── SessionRunner.runStep
+    └── SessionStep.attempt          gen_ai.provider.name, gen_ai.request.model, gen_ai.response.finish_reasons,
+        │                            gen_ai.usage.input_tokens/output_tokens/cache_read.input_tokens,
+        │                            opencode.llm.first_output_ms
+        └── Tool.execute             gen_ai.tool.name, gen_ai.tool.call.id
+            └── ReadTool.read
+```
+
+- No `gen_ai.operation.name` and no message content on spans.
+- `gen_ai.provider.name` is the OpenCode provider id (e.g. `opencode-go`), not the model vendor.
+- `gen_ai.response.finish_reasons` uses AI SDK values (`tool-calls`), not semconv values (`tool_call`).
+- Before v2.2.6, session spans nested under one `ServerProcess.start` trace with no attributes
   ([anomalyco/opencode#60974](https://github.com/anomalyco/opencode/pull/60974)).
 
 ### Claude Code
